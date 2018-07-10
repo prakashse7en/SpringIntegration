@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Implementation-Title: SpringIntegration
+Implementation-Version: 0.0.1
+Built-By: pvittalr
+Implementation-Vendor-Id: com.javasampleapproach.springintegration
+Build-Jdk: 1.8.0_91
+Implementation-URL: http://projects.spring.io/spring-boot/SpringIntegr
+ ation/
+Created-By: Maven Integration for Eclipse
+Implementation-Vendor: Pivotal Software, Inc.
+

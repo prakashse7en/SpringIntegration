@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-http="http://www.springframework.org/schema/integration/http"
+	xmlns:int-mail="http://www.springframework.org/schema/integration/mail"
+	xsi:schemaLocation="
+    http://www.springframework.org/schema/beans
+     http://www.springframework.org/schema/beans/spring-beans.xsd
+    http://www.springframework.org/schema/integration
+    http://www.springframework.org/schema/integration/spring-integration.xsd
+    http://www.springframework.org/schema/integration/http
+    http://www.springframework.org/schema/integration/http/spring-integration-http.xsd
+    http://www.springframework.org/schema/integration/mail
+    http://www.springframework.org/schema/integration/mail/spring-integration-mail.xsd">
+
+
+	<!-- CHANNEL -->
+	<int:channel id="requestChannel" />
+	<int:channel id="outboundMail" />
+	<int:channel id="outputChannel" />
+	<int-http:inbound-gateway request-channel="requestChannel"
+		reply-channel="outputChannel" supported-methods="GET"
+		path="/welcome/{name}" payload-expression="#pathVariables.name">
+
+		<int-http:request-mapping consumes="application/json" produces="application/json" />
+	</int-http:inbound-gateway>
+
+	<int:service-activator ref="welcomeEndpoint" method="get" input-channel="requestChannel" output-channel="outputChannel" />
+	
+	<!-- email code -->
+	<bean id="mailTransformerBean"
+		class="com.javasampleapproach.springintegration.mail.MailTransformer">
+		<property name="mailTo" value="prakash.dec20@gmail.com" />
+		<property name="mailFrom" value="hydroxy.lesnar@gmail.com" />
+		<property name="mailSubject" value="Spring Integration - Test Mail" />
+	</bean>
+	
+	<bean id="mailSender"
+		class="org.springframework.mail.javamail.JavaMailSenderImpl">
+		<property name="host" value="smtp.gmail.com" />
+		<property name="port" value="587" />
+		<property name="username" value="hydroxy.lesnar@gmail.com" />
+		<property name="password" value="Prestige@dec" />
+		<property name="javaMailProperties">
+			<props>
+				<prop key="mail.smtp.auth">true</prop>
+				<prop key="mail.smtp.starttls.enable">true</prop>
+			</props>
+		</property>
+	</bean>
+	
+	
+	<!-- <int-json-to-object-transformer input-channel="outputChannel"  output-channel="outboundMail" /> -->
+	
+	
+
+<!-- Sends the mail to the mailbox with the credentials defined by mailSender bean -->
+	<int-mail:outbound-channel-adapter channel="requestChannel" 
+		mail-sender="mailSender" />		
+
+</beans>

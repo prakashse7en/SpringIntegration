@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:int-jdbc="http://www.springframework.org/schema/integration/jdbc"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:int-http="http://www.springframework.org/schema/integration/http"
+	xsi:schemaLocation="http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd
+		http://www.springframework.org/schema/integration/jdbc http://www.springframework.org/schema/integration/jdbc/spring-integration-jdbc.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/integration/http
+    	http://www.springframework.org/schema/integration/http/spring-integration-http.xsd">
+
+	<!-- CHANNEL -->
+	<int:channel id="requestChannel" />
+	<int:channel id="outputChannel" />
+	<int:channel id="transformerOpChannel" />
+	<int:channel id="transformerOpChannelOne" />
+	<int:channel id="transformerTwo" />
+	<int:channel id="errorchannel" />
+	<int:channel id="createPersonReplyChannel" />
+	<int:channel id="routerChannelOne" />
+	
+	
+	<!-- BEANS -->
+	<bean id="basicTransformer" class="com.javasampleapproach.springintegration.util.BasicTransformer"></bean>
+	<bean id="errorHandler" class="com.javasampleapproach.springintegration.util.ErrorHandler"></bean>
+	<bean id="personResultMapper" class="com.javasampleapproach.springintegration.jdbc.domain.PersonMapper"/>
+	<bean id="routerBasic" class="com.javasampleapproach.springintegration.util.BasicRouter"/>
+	<bean id="replySource" class="org.springframework.integration.jdbc.ExpressionEvaluatingSqlParameterSourceFactory">
+		<property name="parameterExpressions">
+			<map>
+				<entry key="id" value="#this['SCOPE_IDENTITY()']"/>				
+			</map>
+		</property>
+	</bean>	
+
+	<bean id="requestSource" class="org.springframework.integration.jdbc.ExpressionEvaluatingSqlParameterSourceFactory">
+		<property name="parameterExpressions">
+			<map>
+				<entry key="name" value="payload.name.toUpperCase()"/>
+				<entry key="gender" value="payload.gender.identifier"/>
+			</map>
+		</property>
+	</bean>	
+	
+	
+	<!-- JDBC RELEATED CODE -->
+	  <jdbc:embedded-database id="datasource" type="H2">
+        <jdbc:script location="classpath:setup-tables.sql"/>        
+    </jdbc:embedded-database>
+	
+	<!-- GATEWAY LOGIC -->
+	<int-http:inbound-gateway request-channel="requestChannel" reply-channel="outputChannel" error-channel="errorchannel" supported-methods="GET" path="/welcome/{name}" payload-expression="#pathVariables.name">
+		<int-http:request-mapping consumes="application/json" produces="application/json" />
+	</int-http:inbound-gateway>
+	
+	<int:transformer ref="basicTransformer" method="transformReq" input-channel="requestChannel" output-channel="transformerOpChannel"></int:transformer>
+	
+	<!-- router logic starts -->
+	<int:router ref="routerBasic" method="returnChannelName" input-channel="transformerOpChannel" default-output-channel="routerChannelOne"></int:router>
+	<!-- router logic ends -->
+	
+	<int:transformer ref="basicTransformer" method="transformReqOne" input-channel="transformerTwo" output-channel="transformerOpChannelOne"></int:transformer>
+	
+	<int-jdbc:outbound-gateway data-source="datasource" 
+								request-channel="transformerOpChannelOne"
+								reply-channel="outputChannel"
+								update="insert into Person (name,gender) 
+										values
+										(:name,:gender)"
+								query="select * from Person where id = :id"		
+								request-sql-parameter-source-factory="requestSource"
+								reply-sql-parameter-source-factory="replySource"
+								row-mapper="personResultMapper"
+								keys-generated="true"/>
+	
+	
+	<int-jdbc:outbound-gateway data-source="datasource" 
+								request-channel="routerChannelOne"
+								reply-channel="outputChannel"
+								update="insert into Person (name,gender) 
+										values
+										(:name,:gender)"
+								query="select * from Person where id = :id"		
+								request-sql-parameter-source-factory="requestSource"
+								reply-sql-parameter-source-factory="replySource"
+								row-mapper="personResultMapper"
+								keys-generated="true"/>
+	
+	
+	<int:service-activator input-channel="errorchannel" ref="errorHandler" method="error" output-channel="outputChannel"></int:service-activator>
+	
+
+	<!-- <int:service-activator  ref="welcomeEndpoint" method="get" input-channel="requestChannel" output-channel="outputChannel" /> -->
+
+</beans>
